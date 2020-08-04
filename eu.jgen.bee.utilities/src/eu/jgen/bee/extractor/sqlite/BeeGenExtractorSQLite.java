@@ -1,6 +1,18 @@
 /**
- * 
- */
+ * Copyright Marek Stankiewicz, 2020
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ **/
 package eu.jgen.bee.extractor.sqlite;
 
 import java.io.FileNotFoundException;
@@ -8,7 +20,6 @@ import java.util.List;
 
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteConfig.JournalMode;
-import org.sqlite.SQLiteConfig.Pragma;
 
 import java.sql.*;
 
@@ -28,7 +39,7 @@ import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
 
-public class BeeGenModelCreator {
+public class BeeGenExtractorSQLite {
 
 	private Connection connection = null;
 	private Model model;
@@ -39,8 +50,8 @@ public class BeeGenModelCreator {
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Creator, Version 0.1.");
-		BeeGenModelCreator extractor = new BeeGenModelCreator();
+		System.out.println("Bee Gen Model Creator for SQLite, Version 0.1.");
+		BeeGenExtractorSQLite extractor = new BeeGenExtractorSQLite();
 		try {
 			extractor.usage();
 			extractor.start(args[0], args[1]);
@@ -52,7 +63,7 @@ public class BeeGenModelCreator {
 			System.out.println("Cannot find model oin the encyclopedia.");
 			e.printStackTrace();
 		} catch (FileNotFoundException e) {
-			System.out.println("Problem with creating output stream.");
+			System.out.println("Problem with creating SQLIte database.");
 			e.printStackTrace();
 		}
 	}
@@ -61,7 +72,7 @@ public class BeeGenModelCreator {
 		System.out.println("USAGE:");
 		System.out.println(
 				"\tpathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)");
-		System.out.println("\tpathOutput      -  Location of the directory to store generated Gen Bee Model ");
+		System.out.println("\tpathOutput      -  Location of the directory to store generated SQLLite database ");
 		System.out.println("\n");
 	}
 
@@ -84,8 +95,7 @@ public class BeeGenModelCreator {
 			final SQLiteConfig config = new SQLiteConfig();
 			config.setJournalMode( JournalMode.OFF);
 			connection = config.createConnection("jdbc:sqlite:" + outputPath + "\\model.db");
-			
-	//		connection = DriverManager.getConnection("jdbc:sqlite:" + outputPath + "\\model.db");
+
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
 			System.exit(0);
@@ -133,17 +143,16 @@ public class BeeGenModelCreator {
 	    	extractObjectsAndProperties();
 			extractAssociations();
 			connection.commit();
+			stmt.close();
 		} catch (SQLException e) {
 			System.out.println(e.getMessage());
 		} catch (EncyUnsupportedOperationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println(e.getMessage());
 		}
-
 	}
 
 	/*
-	 * Creates JSON file containing all model objects and their properties.
+	 * Populates  tables creating model objects and their properties.
 	 */
 	private void extractObjectsAndProperties() throws EncyUnsupportedOperationException, SQLException {
 		System.out.println("Loading objects and properties...");
@@ -204,6 +213,9 @@ public class BeeGenModelCreator {
 		}
 	}
 	
+	/*
+	 * Populates  tables creating model associations.
+	 */
 	private void extractAssociations() throws EncyUnsupportedOperationException, SQLException {
 		System.out.println("Loading associations...");
 		String queryAsc = "INSERT INTO GenAssociations  (fromObjid, ascType, toObjid, inverseAscType, ascMnemonic, card, direction, seqno ) VALUES (?,?,?,?,?,?,?,?);";

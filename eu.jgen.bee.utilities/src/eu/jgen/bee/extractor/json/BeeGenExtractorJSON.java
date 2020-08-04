@@ -1,3 +1,18 @@
+/**
+ * Copyright Marek Stankiewicz, 2020
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ **/
 package eu.jgen.bee.extractor.json;
 
 import java.io.FileNotFoundException;
@@ -25,7 +40,7 @@ import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
 
-public class CAGenExtractor {
+public class BeeGenExtractorJSON {
 
 	private Model model;
 	private Ency ency;
@@ -35,8 +50,8 @@ public class CAGenExtractor {
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Extractor, Version 0.1.");
-		CAGenExtractor extractor = new CAGenExtractor();
+		System.out.println("Bee Gen  Extractor for JSON, Version 0.1.");
+		BeeGenExtractorJSON extractor = new BeeGenExtractorJSON();
 		try {
 			extractor.usage();
 			extractor.start(args[0], args[1]);
