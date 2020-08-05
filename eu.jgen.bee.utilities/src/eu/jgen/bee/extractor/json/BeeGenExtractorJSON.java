@@ -15,6 +15,7 @@
  **/
 package eu.jgen.bee.extractor.json;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.List;
@@ -41,26 +42,32 @@ import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
 
 public class BeeGenExtractorJSON {
+	
+	private static final String ASSOCIATIONS_JSON = "associations.json";
+	private static final String OBJECTS_JSON = "objects.json";
+	private static final String STRING_SLASH = "\\";
+	private String BEE_FOLDER_NAME = "bee"; 
 
 	private Model model;
 	private Ency ency;
 	private int objectcount;
 	private int propertycount;
 	private int associationcount;
+	private String modelName ="UNKNOWN";
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen  Extractor for JSON, Version 0.1.");
+		System.out.println("Bee Gen  Model Extractor, Version 0.2");
 		BeeGenExtractorJSON extractor = new BeeGenExtractorJSON();
 		try {
 			extractor.usage();
-			extractor.start(args[0], args[1]);
+			extractor.start(args[0]);
 			System.out.println("Extraction completed.");
 		} catch (EncyException e) {
 			System.out.println("Problem with connecting to the encyclopedia.");
 			e.printStackTrace();
 		} catch (ModelNotFoundException e) {
-			System.out.println("Cannot find model oin the encyclopedia.");
+			System.out.println("Cannot find model in the encyclopedia.");
 			e.printStackTrace();
 		} catch (FileNotFoundException e) {
 			System.out.println("Problem with creating output stream.");
@@ -72,24 +79,51 @@ public class BeeGenExtractorJSON {
 		System.out.println("USAGE:");
 		System.out.println(
 				"\tpathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)");
-		System.out.println(
-				"\tpathOutput      -  Location of the directory to store generated files objects.json and association.json");
 		System.out.println("\n");
 	}
 
-	private void start(String modelPath, String outputPath)
+	/*
+	 * Two json files will be created in a new bee sub-folder of the <your-model> .ief folder.
+	 * Previous files will be overwritten by a newly created ones.
+	 */
+	private void start(String modelPath)
 			throws EncyException, ModelNotFoundException, FileNotFoundException {
+		 System.out.println("Connecting to the CA Gen Model\n");
 		ency = EncyManager.connectLocalForReadOnly(modelPath);
 		model = ModelManager.open(ency, ency.getModelIds().get(0));
-
-		FileOutputStream outputStreamForObjects = new FileOutputStream(outputPath + "objects.json");
+		modelName = model.getName();
+		
+		String outputPath = clearTargetDestination(modelPath);
+		System.out.println("Connected to the model " + modelName + ".");
+		
+		FileOutputStream outputStreamForObjects = new FileOutputStream(outputPath +  STRING_SLASH +OBJECTS_JSON);
 		extractObjectsAndProperties(outputStreamForObjects);
 		System.out.println("\tStarting...");
-		FileOutputStream outputStreamForAssociations = new FileOutputStream(outputPath + "associations.json");
+		FileOutputStream outputStreamForAssociations = new FileOutputStream(outputPath +  STRING_SLASH + ASSOCIATIONS_JSON);
 		extractAssociations(outputStreamForAssociations);
 		System.out.println("\tNumber of exported objects is " + objectcount);
 		System.out.println("\tNumber of exported properties is " + propertycount);
 		System.out.println("\tNumber of exported associations is " + associationcount);
+	}
+	
+	private String clearTargetDestination(String modelPath) {
+		File file = new File(modelPath);
+		if(! file.isDirectory()) {
+			System.out.println("Specified model path is not a correct folder.");
+			System.exit(9);
+		}
+		file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME);
+		if (file.exists()) {
+			file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +  OBJECTS_JSON);
+			file.delete();
+			file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +  ASSOCIATIONS_JSON);
+			file.delete();
+			return modelPath + STRING_SLASH + BEE_FOLDER_NAME;
+		}
+		if (file.mkdir()) {
+			return modelPath + STRING_SLASH + BEE_FOLDER_NAME;
+		}
+		return null;
 	}
 
 	/*

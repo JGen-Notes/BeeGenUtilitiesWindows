@@ -15,13 +15,16 @@
  **/
 package eu.jgen.bee.extractor.sqlite;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 
 import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteConfig.JournalMode;
-
-import java.sql.*;
 
 import com.ca.gen.jmmi.Ency;
 import com.ca.gen.jmmi.EncyManager;
@@ -38,8 +41,18 @@ import com.ca.gen.jmmi.schema.ObjTypeHelper;
 import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
-
+/*
+ * This class allows extract design metadata from the CA Gen Local Model and load
+ * data to the purpose build SQLite database. The SQLite database constitutes 
+ * Bee Gen Model that has its own API supporting essential basic inquiries, which
+ * is a simililar to what CA Gen API offers. The Bee Gen API does not support 
+ * adding new objects and updating existing ones.
+ * 
+ */
 public class BeeGenExtractorSQLite {
+	
+	private static final String STRING_SLASH = "\\";
+	private String BEE_FOLDER_NAME = "bee"; 
 
 	private Connection connection = null;
 	private Model model;
@@ -47,20 +60,21 @@ public class BeeGenExtractorSQLite {
 	private int objectcount;
 	private int propertycount;
 	private int associationcount;
+	private String modelName ="UNKNOWN";
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Creator for SQLite, Version 0.1.");
+		System.out.println("Bee Gen Model Creator, Version 0.2");
 		BeeGenExtractorSQLite extractor = new BeeGenExtractorSQLite();
 		try {
 			extractor.usage();
-			extractor.start(args[0], args[1]);
+			extractor.start(args[0]);
 			System.out.println("Extraction completed.");
 		} catch (EncyException e) {
 			System.out.println("Problem with connecting to the encyclopedia.");
 			e.printStackTrace();
 		} catch (ModelNotFoundException e) {
-			System.out.println("Cannot find model oin the encyclopedia.");
+			System.out.println("Cannot find model in the encyclopedia.");
 			e.printStackTrace();
 		} catch (FileNotFoundException e) {
 			System.out.println("Problem with creating SQLIte database.");
@@ -72,20 +86,44 @@ public class BeeGenExtractorSQLite {
 		System.out.println("USAGE:");
 		System.out.println(
 				"\tpathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)");
-		System.out.println("\tpathOutput      -  Location of the directory to store generated SQLLite database ");
 		System.out.println("\n");
 	}
 
-	private void start(String modelPath, String outputPath)
+	private void start(String modelPath)
 			throws EncyException, ModelNotFoundException, FileNotFoundException {
+		 System.out.println("Connecting to the CA Gen Model\n");
 		ency = EncyManager.connectLocalForReadOnly(modelPath);
 		model = ModelManager.open(ency, ency.getModelIds().get(0));
-
+		modelName = model.getName();
+		String outputPath = clearTargetDestination(modelPath);
+		System.out.println("Connected to the model " + modelName + ".");
 		createDatabase(outputPath);
 
 		System.out.println("\tNumber of exported objects is " + objectcount);
 		System.out.println("\tNumber of exported properties is " + propertycount);
 		System.out.println("\tNumber of exported associations is " + associationcount);
+	}
+
+	/*
+	 * The Bee Gen Model will be created in a new bee sub-folder of the <your-model> .ief folder.
+	 * Previous model will be overwritten by a newly created one.
+	 */
+	private String clearTargetDestination(String modelPath) {
+		File file = new File(modelPath);
+		if(! file.isDirectory()) {
+			System.out.println("Specified model path is not a correct folder.");
+			System.exit(9);
+		}
+		file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME);
+		if (file.exists()) {
+			file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +  modelName + ".db");
+			file.delete();
+			return modelPath + STRING_SLASH + BEE_FOLDER_NAME;
+		}
+		if (file.mkdir()) {
+			return modelPath + STRING_SLASH + BEE_FOLDER_NAME;
+		}
+		return null;
 	}
 
 	private void createDatabase(String outputPath) {
@@ -94,7 +132,7 @@ public class BeeGenExtractorSQLite {
 			Class.forName("org.sqlite.JDBC");
 			final SQLiteConfig config = new SQLiteConfig();
 			config.setJournalMode( JournalMode.OFF);
-			connection = config.createConnection("jdbc:sqlite:" + outputPath + "\\model.db");
+			connection = config.createConnection("jdbc:sqlite:" + outputPath + STRING_SLASH+ modelName + ".db");
 
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
