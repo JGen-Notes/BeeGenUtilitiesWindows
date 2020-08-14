@@ -219,10 +219,11 @@ public class BeeGenExtractorSQLite {
 					String textValue = mmObj.getTextProperty(prp);
 					if (textValue != PrpTypeHelper.getDefaultTxtValue(mmObj.getObjTypeCode(), prp)
 							&& textValue.length() != 0) {
-						statementObj.setString(4, textValue);
+						if (format == PrpFormat.NAME) {
+							statementObj.setString(4, textValue);
+						}					
 						statementPrp.setString(5, textValue);
-						statementPrp.executeUpdate();
-						
+						statementPrp.executeUpdate();						
 						propertycount++;
 						continue;
 					}
