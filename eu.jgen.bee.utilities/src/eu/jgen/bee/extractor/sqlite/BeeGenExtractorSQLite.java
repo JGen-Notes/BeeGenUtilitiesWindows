@@ -37,10 +37,12 @@ import com.ca.gen.jmmi.exceptions.ModelNotFoundException;
 import com.ca.gen.jmmi.ids.ObjId;
 import com.ca.gen.jmmi.schema.AscTypeCode;
 import com.ca.gen.jmmi.schema.AscTypeHelper;
+import com.ca.gen.jmmi.schema.ObjTypeCode;
 import com.ca.gen.jmmi.schema.ObjTypeHelper;
 import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
+
 /*
  * This class allows extract design metadata from the CA Gen Local Model and load
  * data to the purpose build SQLite database. The SQLite database constitutes 
@@ -50,9 +52,9 @@ import com.ca.gen.jmmi.util.PrpFormat;
  * 
  */
 public class BeeGenExtractorSQLite {
-	
+
 	private static final String STRING_SLASH = "\\";
-	private String BEE_FOLDER_NAME = "bee"; 
+	private String BEE_FOLDER_NAME = "bee";
 
 	private Connection connection = null;
 	private Model model;
@@ -60,11 +62,15 @@ public class BeeGenExtractorSQLite {
 	private int objectcount;
 	private int propertycount;
 	private int associationcount;
-	private String modelName ="UNKNOWN";
+	private int objectmetacount;
+	private int propertymetacount;
+	private int associationmetacount;
+	
+	private String modelName = "UNKNOWN";
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Creator, Version 0.2");
+		System.out.println("Bee Gen Model Creator, Version 0.3");
 		BeeGenExtractorSQLite extractor = new BeeGenExtractorSQLite();
 		try {
 			extractor.usage();
@@ -89,9 +95,8 @@ public class BeeGenExtractorSQLite {
 		System.out.println("\n");
 	}
 
-	private void start(String modelPath)
-			throws EncyException, ModelNotFoundException, FileNotFoundException {
-		 System.out.println("Connecting to the CA Gen Model\n");
+	private void start(String modelPath) throws EncyException, ModelNotFoundException, FileNotFoundException {
+		System.out.println("Connecting to the CA Gen Model\n");
 		ency = EncyManager.connectLocalForReadOnly(modelPath);
 		model = ModelManager.open(ency, ency.getModelIds().get(0));
 		modelName = model.getName();
@@ -99,24 +104,30 @@ public class BeeGenExtractorSQLite {
 		System.out.println("Connected to the model " + modelName + ".");
 		createDatabase(outputPath);
 
+		System.out.println("\nStatistics:\n");
 		System.out.println("\tNumber of exported objects is " + objectcount);
 		System.out.println("\tNumber of exported properties is " + propertycount);
 		System.out.println("\tNumber of exported associations is " + associationcount);
+		
+		System.out.println("\tNumber of exported meta objects is " + objectmetacount);
+		System.out.println("\tNumber of exported meta properties is " + propertymetacount);
+		System.out.println("\tNumber of exported meta associations is " + associationmetacount); 
+		System.out.println("\n");
 	}
 
 	/*
-	 * The Bee Gen Model will be created in a new bee sub-folder of the <your-model> .ief folder.
-	 * Previous model will be overwritten by a newly created one.
+	 * The Bee Gen Model will be created in a new bee sub-folder of the <your-model>
+	 * .ief folder. Previous model will be overwritten by a newly created one.
 	 */
 	private String clearTargetDestination(String modelPath) {
 		File file = new File(modelPath);
-		if(! file.isDirectory()) {
+		if (!file.isDirectory()) {
 			System.out.println("Specified model path is not a correct folder.");
 			System.exit(9);
 		}
 		file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME);
 		if (file.exists()) {
-			file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +  modelName + ".db");
+			file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH + modelName + ".db");
 			file.delete();
 			return modelPath + STRING_SLASH + BEE_FOLDER_NAME;
 		}
@@ -131,8 +142,8 @@ public class BeeGenExtractorSQLite {
 		try {
 			Class.forName("org.sqlite.JDBC");
 			final SQLiteConfig config = new SQLiteConfig();
-			config.setJournalMode( JournalMode.OFF);
-			connection = config.createConnection("jdbc:sqlite:" + outputPath + STRING_SLASH+ modelName + ".db");
+			config.setJournalMode(JournalMode.OFF);
+			connection = config.createConnection("jdbc:sqlite:" + outputPath + STRING_SLASH + modelName + ".db");
 
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
@@ -144,42 +155,86 @@ public class BeeGenExtractorSQLite {
 		String droptbl2 = "DROP TABLE  IF EXISTS GenAssociations;";
 		String droptbl3 = "DROP TABLE  IF EXISTS GenProperties;";
 
+		String droptbl4 = "DROP TABLE  IF EXISTS GenMetaObjects;";
+		String droptbl5 = "DROP TABLE  IF EXISTS GenMetaAssociations;";
+		String droptbl6 = "DROP TABLE  IF EXISTS GenMetaProperties;";
+
 		String sqlTblObj = "CREATE TABLE  GenObjects (\n" + "	id INTEGER PRIMARY KEY,\n"
 				+ "  objType  INTEGER NOT NULL,\n" + "  objMnemonic TEXT NOT NULL,\n" + "	name TEXT\n" + ");";
 
 		String sqlTblAsc = "CREATE TABLE  GenAssociations (\n" + "	fromObjid            INTEGER,\n"
 				+ "  ascType                 INTEGER NOT NULL,\n" + "  toObjid                  INTEGER NOT NULL,\n"
 				+ "  inverseAscType   INTEGER NOT NULL,\n" + "  ascMnemonic      TEXT NOT NULL,\n"
-				+ "  card                        TEXT NOT NULL,\n" + "	direction               TEXT,\n" 
-				+ "  seqno                      INTEGER NOT NULL,\n"  
-				+ "PRIMARY KEY (fromObjid, ascType, seqno)"
-				+ ");";
+				+ "  card                        TEXT NOT NULL,\n" + "	direction               TEXT,\n"
+				+ "  seqno                      INTEGER NOT NULL,\n" + "PRIMARY KEY (fromObjid, ascType, seqno)" + ");";
 
 		String sqlTblPrp = "CREATE TABLE  GenProperties (\n" + "	objid            INTEGER,\n"
-				+ "  prpType                 INTEGER NOT NULL,\n"  
-				+ "  mnemonic            TEXT NOT NULL,\n" + "  format                   TEXT NOT NULL,\n"
-				+ "	value                      TEXT,\n"
-				+ "PRIMARY KEY (objid, prpType)"
+				+ "  prpType                 INTEGER NOT NULL,\n" + "  mnemonic            TEXT NOT NULL,\n"
+				+ "  format                   TEXT NOT NULL,\n" + "	value                      TEXT,\n"
+				+ "PRIMARY KEY (objid, prpType)" + ");";
+
+		String sqlTblMetaObj = "CREATE TABLE  GenMetaObjects (\n" + "	objType INTEGER PRIMARY KEY,\n"
+				+ " objMnemonic TEXT NOT NULL);";		
+
+		String sqlTblMetaPrp = "CREATE TABLE  GenMetaProperties (\n" 
+				+ "	objType            INTEGER NOT NULL,\n"
+				+ " prpType            INTEGER NOT NULL,\n" 
+				+ " prpMnemonic        TEXT NOT NULL,\n"
+				+ " format             TEXT NOT NULL,\n" 
+				+ " length             INTEGER NOT NULL,\n"
+	 			+ "	defaultInt         INTEGER NOT NULL,\n" 
+	 			+ "	defaultText        TEXT NOT NULL,\n"
+	 			+ "	defaultChar        TEXT NOT NULL,\n"
+				+ "PRIMARY KEY (objtype, prpType)"
+				+ ");";
+		
+		String sqlTblMetaAsc = "CREATE TABLE  GenMetaAssociations (\n" 
+				+ "	fromObjType         INTEGER NOT NULL,\n"
+				+ " ascType             INTEGER NOT NULL,\n" 
+				+ " ascMnemonic         TEXT NOT NULL,\n"
+				+ "	direction           TEXT NOT NULL,\n" 
+				+ " inverseAscType      INTEGER NOT NULL,\n"
+				+ " optionality         TEXT NOT NULL,\n" 
+				+ " card                TEXT NOT NULL,\n"
+				+ " ordered             TEXT NOT NULL,\n" 
+				+ "PRIMARY KEY (fromObjType, ascType)" 
 				+ ");";
 
+		
+		
 		try {
 			Statement stmt = connection.createStatement();
 
 			stmt.execute(droptbl1);
 			stmt.execute(droptbl2);
 			stmt.execute(droptbl3);
+			stmt.execute(droptbl4);
+			stmt.execute(droptbl5);
+			stmt.execute(droptbl6);
 
 			System.out.println("Tables dropped");
 
 			stmt.execute(sqlTblObj);
 			stmt.execute(sqlTblAsc);
 			stmt.execute(sqlTblPrp);
+			
+			stmt.execute(sqlTblMetaObj);			
+			stmt.execute(sqlTblMetaPrp);			
+			stmt.execute(sqlTblMetaAsc);
 
 			System.out.println("Tables created");
-			
+
 			connection.setAutoCommit(false);
-	    	extractObjectsAndProperties();
-			extractAssociations();
+			
+			extractObjectsAndProperties();
+//			extractAssociations();
+//			
+//			extractMeatDataForObjects();
+//			extractMeatDataForProperties();
+//			extractMeatDataForAssociations();
+			
+			generateEnumForObjects();
+			
 			connection.commit();
 			stmt.close();
 		} catch (SQLException e) {
@@ -188,15 +243,154 @@ public class BeeGenExtractorSQLite {
 			System.out.println(e.getMessage());
 		}
 	}
+	
+	private void generateEnumForObjects() {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("package eu.jgen.beegen.model.meta;\n");
+		buffer.append("public enum OBjMetaType {\n");
+		for (ObjTypeCode objTypeCode : ObjTypeCode.values()) {
+			short code = ObjTypeHelper.getCode(objTypeCode);
+			if (code != -1) {
+				buffer.append("\t" + ObjTypeHelper.getMnemonic(objTypeCode) + "((short) " + code + "),\n");
+			}
+		}
+		buffer.append("\tINVALID((short) -1)\n");
+		buffer.append("\tDISCOVER((short) -2)\n");
+		buffer.append("\n\tprivate final short code;\n");
+		buffer.append("\n\tObjMetaType(short code) {\n");
+		buffer.append("\t\this.code = code;\n");
+		buffer.append("\t}\n");
+		buffer.append("\n\tpublic ObjMetaType getType(short code) {\n");
+		buffer.append("\t\tfor (ObjMetaType obj : ObjMetaType.values()) {\n");
+		buffer.append("\t\t\tif (obj.code == code) {\n");
+		buffer.append("\t\t\t\treturn obj;\n");
+		buffer.append("\t\t\t}\n");
+		buffer.append("\t\t}\n");
+		buffer.append("\t\treturn ObjMetaType.INVALID;\n");
+		buffer.append("\t}\n");		
+		buffer.append("}");
+		System.out.println(buffer);		
+	}
+	
+	
+	/*
+	 * Populates tables with meta data.
+	 */
+	
+	private void extractMeatDataForAssociations() throws SQLException {
+		System.out.println("Loading meta data for associations...");
+
+		String queryMetaAsc = "INSERT INTO GenMetaAssociations  (fromObjType, ascType, ascMnemonic, direction, inverseAscType, optionality, card, ordered) VALUES (?,?,?,?,?,?,?,?);";
+		PreparedStatement statementAsc = connection.prepareStatement(queryMetaAsc);
+		for (ObjTypeCode objTypeCode : ObjTypeCode.values()) {
+			if (objTypeCode == ObjTypeCode.HORIZUS ||
+					objTypeCode == ObjTypeCode.GUIPROP) {
+				continue;
+			}
+			//System.out.println(objTypeCode);
+			for (AscTypeCode ascTypeCode : ObjTypeHelper.getAssociations(objTypeCode)) {
+				//System.out.println("\t " + ascTypeCode);
+				statementAsc.setInt(1, ObjTypeHelper.getCode(objTypeCode));
+				statementAsc.setInt(2, AscTypeHelper.getCode(ascTypeCode));
+				statementAsc.setString(3, AscTypeHelper.getMnemonic(ascTypeCode));
+				if (AscTypeHelper.isForward(objTypeCode, ascTypeCode)) {
+					statementAsc.setString(4, "F");
+				} else {
+					statementAsc.setString(4, "B");
+				}			
+				//statementAsc.setInt(5, AscTypeHelper.getCode(AscTypeHelper.getInverse(objTypeCode, ascTypeCode)));
+				statementAsc.setInt(5,100);
+				if (AscTypeHelper.isIgnorable(objTypeCode, ascTypeCode)) {
+					statementAsc.setString(6, "Y");
+				} else {
+					statementAsc.setString(6, "N");
+				}
+				if (AscTypeHelper.isOneToMany(objTypeCode, ascTypeCode)) {
+					statementAsc.setString(7, "M");
+				} else {
+					statementAsc.setString(7, "1");
+				}
+				if (AscTypeHelper.isOrdered(objTypeCode, ascTypeCode)) {
+					statementAsc.setString(8, "Y");
+				} else {
+					statementAsc.setString(8, "N");
+				}	
+				statementAsc.executeUpdate();
+				associationmetacount++;				
+			}			
+		}
+	}
+
+	private void extractMeatDataForProperties() throws SQLException {
+		System.out.println("Loading meta data for properties...");
+		String queryMetaPrp = "INSERT INTO GenMetaProperties  (objType, prpType, prpMnemonic, format, length, defaultInt, defaultText, defaultChar) VALUES (?,?,?,?,?,?,?,?);";
+		PreparedStatement statementPrp = connection.prepareStatement(queryMetaPrp);
+		for (ObjTypeCode objTypeCode : ObjTypeCode.values()) {
+			for (PrpTypeCode prpTypeCode : ObjTypeHelper.getProperties(objTypeCode)) {
+				statementPrp.setInt(1, ObjTypeHelper.getCode(objTypeCode));
+				statementPrp.setInt(2, PrpTypeHelper.getCode(prpTypeCode));
+				statementPrp.setString(3, PrpTypeHelper.getMnemonic(prpTypeCode));
+				String format = PrpTypeHelper.getFormat(objTypeCode, prpTypeCode).name();
+				statementPrp.setString(4,  format);
+				int length = PrpTypeHelper.getLength(objTypeCode, prpTypeCode);
+				statementPrp.setInt(5, length);
+				
+				switch (format) {
+				case "NAME":
+				case "LOADNAME":
+				case "TEXT":
+					statementPrp.setDouble(6, 0);
+					if (length == 0) {
+						statementPrp.setString(7,"");
+					} else {
+						statementPrp.setString(7, PrpTypeHelper.getDefaultTxtValue(objTypeCode, prpTypeCode));							
+					}
+					statementPrp.setString(8,"");
+					break;
+				case "INT":
+				case "SINT":
+					statementPrp.setDouble(6, PrpTypeHelper.getDefaultIntValue(objTypeCode, prpTypeCode));
+					statementPrp.setString(7, "");	
+					statementPrp.setString(8,"");
+					break;					
+				case "CHAR":
+					statementPrp.setDouble(6, 0);	
+					statementPrp.setString(7,"");
+				 	statementPrp.setString(8, String.valueOf(PrpTypeHelper.getDefaultChrValue(objTypeCode, prpTypeCode)));
+			    	break;
+				
+				default:
+					statementPrp.setDouble(6, 0);
+					statementPrp.setString(7,"");
+					statementPrp.setString(8,"");
+					break;
+				}	    	 	
+ 				statementPrp.executeUpdate();
+				propertymetacount++;
+			}
+		}
+	}
+
+	private void extractMeatDataForObjects() throws SQLException {
+		System.out.println("Loading meta data for objects...");
+		String queryMetaObj = "INSERT INTO GenMetaObjects  (objType, objMnemonic) VALUES (?,?);";
+		PreparedStatement statementObj = connection.prepareStatement(queryMetaObj);
+		for (ObjTypeCode objTypeCode : ObjTypeCode.values()) {
+			statementObj.setInt(1, ObjTypeHelper.getCode(objTypeCode));
+			statementObj.setString(2, objTypeCode.toString());
+			statementObj.executeUpdate();
+			objectmetacount++;
+		}
+	}
 
 	/*
-	 * Populates  tables creating model objects and their properties.
+	 * Populates tables creating model objects and their properties.
 	 */
 	private void extractObjectsAndProperties() throws EncyUnsupportedOperationException, SQLException {
 		System.out.println("Loading objects and properties...");
 		String queryObj = "INSERT INTO GenObjects  (id, objType, objMnemonic, name ) VALUES (?,?,?,?);";
 		PreparedStatement statementObj = connection.prepareStatement(queryObj);
-		
+
 		String queryPrp = "INSERT INTO GenProperties  (objid, prpType, mnemonic, format, value ) VALUES (?,?,?,?,?);";
 		PreparedStatement statementPrp = connection.prepareStatement(queryPrp);
 
@@ -209,21 +403,21 @@ public class BeeGenExtractorSQLite {
 			List<PrpTypeCode> listprp = ObjTypeHelper.getProperties(mmObj.getObjTypeCode());
 			for (PrpTypeCode prp : listprp) {
 				PrpFormat format = PrpTypeHelper.getFormat(mmObj.getObjTypeCode(), prp);
-				
+
 				statementPrp.setLong(1, objId.getValue());
-				statementPrp.setShort(2,  PrpTypeHelper.getCode(prp));
+				statementPrp.setShort(2, PrpTypeHelper.getCode(prp));
 				statementPrp.setString(3, prp.name());
 				statementPrp.setString(4, format.name());
-				
+
 				if (format == PrpFormat.TEXT || format == PrpFormat.LOADNAME || format == PrpFormat.NAME) {
 					String textValue = mmObj.getTextProperty(prp);
 					if (textValue != PrpTypeHelper.getDefaultTxtValue(mmObj.getObjTypeCode(), prp)
 							&& textValue.length() != 0) {
 						if (format == PrpFormat.NAME) {
 							statementObj.setString(4, textValue);
-						}					
+						}
 						statementPrp.setString(5, textValue);
-						statementPrp.executeUpdate();						
+						statementPrp.executeUpdate();
 						propertycount++;
 						continue;
 					}
@@ -239,7 +433,7 @@ public class BeeGenExtractorSQLite {
 				} else if (format == PrpFormat.INT || format == PrpFormat.SINT) {
 					int intValue = mmObj.getIntProperty(prp);
 					if (intValue != PrpTypeHelper.getDefaultIntValue(mmObj.getObjTypeCode(), prp)) {
-						
+
 						statementPrp.setString(5, String.valueOf(intValue));
 						statementPrp.executeUpdate();
 						propertycount++;
@@ -251,9 +445,9 @@ public class BeeGenExtractorSQLite {
 			objectcount++;
 		}
 	}
-	
+
 	/*
-	 * Populates  tables creating model associations.
+	 * Populates tables creating model associations.
 	 */
 	private void extractAssociations() throws EncyUnsupportedOperationException, SQLException {
 		System.out.println("Loading associations...");
