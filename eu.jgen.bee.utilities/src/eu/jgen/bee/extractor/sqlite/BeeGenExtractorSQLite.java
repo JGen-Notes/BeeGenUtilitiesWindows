@@ -52,6 +52,9 @@ import com.ca.gen.jmmi.util.PrpFormat;
  * 
  */
 public class BeeGenExtractorSQLite {
+	
+	private static String VERSION = "0.4";
+	private String SCHEMA = "9.2.A6";
 
 	private static final String STRING_SLASH = "\\";
 	private String BEE_FOLDER_NAME = "bee";
@@ -70,7 +73,7 @@ public class BeeGenExtractorSQLite {
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Creator, Version 0.3");
+		System.out.println("Bee Gen Model Creator, Version " + VERSION);
 		BeeGenExtractorSQLite extractor = new BeeGenExtractorSQLite();
 		try {
 			extractor.usage();
@@ -150,7 +153,7 @@ public class BeeGenExtractorSQLite {
 			System.exit(0);
 		}
 		System.out.println("Opened database successfully");
-
+		
 		String droptbl1 = "DROP TABLE IF EXISTS  GenObjects;";
 		String droptbl2 = "DROP TABLE  IF EXISTS GenAssociations;";
 		String droptbl3 = "DROP TABLE  IF EXISTS GenProperties;";
@@ -158,6 +161,9 @@ public class BeeGenExtractorSQLite {
 		String droptbl4 = "DROP TABLE  IF EXISTS GenMetaObjects;";
 		String droptbl5 = "DROP TABLE  IF EXISTS GenMetaAssociations;";
 		String droptbl6 = "DROP TABLE  IF EXISTS GenMetaProperties;";
+		
+		String droptbl7 = "DROP TABLE IF EXISTS  GenModel;";
+
 
 		String sqlTblObj = "CREATE TABLE  GenObjects (\n" + "	id INTEGER PRIMARY KEY,\n"
 				+ "  objType  INTEGER NOT NULL,\n" + "  objMnemonic TEXT NOT NULL,\n" + "	name TEXT\n" + ");";
@@ -200,6 +206,10 @@ public class BeeGenExtractorSQLite {
 				+ "PRIMARY KEY (fromObjType, ascType)" 
 				+ ");";
 
+		String sqlTblModel = "CREATE TABLE GenModel (\n"
+				+ " key TEXT NOT NULL PRIMARY KEY,\n"
+				+ " value TEXT NOT NULL"
+				+ ");";
 		
 		
 		try {
@@ -211,6 +221,7 @@ public class BeeGenExtractorSQLite {
 			stmt.execute(droptbl4);
 			stmt.execute(droptbl5);
 			stmt.execute(droptbl6);
+			stmt.execute(droptbl7);
 
 			System.out.println("Tables dropped");
 
@@ -221,19 +232,26 @@ public class BeeGenExtractorSQLite {
 			stmt.execute(sqlTblMetaObj);			
 			stmt.execute(sqlTblMetaPrp);			
 			stmt.execute(sqlTblMetaAsc);
+			
+			stmt.execute(sqlTblModel);
 
 			System.out.println("Tables created");
 
 			connection.setAutoCommit(false);
 			
 			extractObjectsAndProperties();
+			
+			populateModel();
+			
 //			extractAssociations();
 //			
 //			extractMeatDataForObjects();
 //			extractMeatDataForProperties();
 //			extractMeatDataForAssociations();
 			
-			generateEnumForObjects();
+//			generateEnumForObjects();
+//			generateEnumForProperties();
+			generateEnumForAssociations();
 			
 			connection.commit();
 			stmt.close();
@@ -244,10 +262,82 @@ public class BeeGenExtractorSQLite {
 		}
 	}
 	
+	private void populateModel() throws SQLException {
+		String queryModel = "INSERT INTO GenModel  (key, value) VALUES (?,?);";
+		PreparedStatement statementModel = connection.prepareStatement(queryModel);
+		statementModel.setString(1, "name");
+		statementModel.setString(2, model.getName());
+		statementModel.executeUpdate();
+		statementModel.setString(1, "version");
+		statementModel.setString(2, VERSION);
+		statementModel.executeUpdate();
+		statementModel.setString(1, "schema");
+		statementModel.setString(2, SCHEMA);
+		statementModel.executeUpdate();
+		statementModel.close();
+	}
+	
+	private void generateEnumForProperties() {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("package eu.jgen.beegen.model.meta;\n");
+		buffer.append("public enum PrpMetaType {\n");
+		for (PrpTypeCode prpTypeCode : PrpTypeCode.values()) {
+			short code = PrpTypeHelper.getCode(prpTypeCode);
+			if (code != -1) {
+				buffer.append("\t" + PrpTypeHelper.getMnemonic(prpTypeCode) + "((short) " + code + "),\n");
+			}
+		}
+		buffer.append("\tINVALID((short) -1)\n");
+		buffer.append("\tDISCOVER((short) -2)\n");
+		buffer.append("\n\tprivate final short code;\n");
+		buffer.append("\n\tPrpMetaType(short code) {\n");
+		buffer.append("\t\this.code = code;\n");
+		buffer.append("\t}\n");
+		buffer.append("\n\tpublic PrpMetaType getType(short code) {\n");
+		buffer.append("\t\tfor (PrpMetaType obj : PrpMetaType.values()) {\n");
+		buffer.append("\t\t\tif (obj.code == code) {\n");
+		buffer.append("\t\t\t\treturn obj;\n");
+		buffer.append("\t\t\t}\n");
+		buffer.append("\t\t}\n");
+		buffer.append("\t\treturn PrpMetaType.INVALID;\n");
+		buffer.append("\t}\n");		
+		buffer.append("}");
+		System.out.println(buffer);		
+	}
+	
+	private void generateEnumForAssociations() {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("package eu.jgen.beegen.model.meta;\n");
+		buffer.append("public enum AscMetaType {\n");
+		for (AscTypeCode ascTypeCode : AscTypeCode.values()) {
+			short code = AscTypeHelper.getCode(ascTypeCode);
+			if (code != -1) {
+				buffer.append("\t" + AscTypeHelper.getMnemonic(ascTypeCode) + "((short) " + code + "),\n");
+			}
+		}
+		buffer.append("\tINVALID((short) -1)\n");
+		buffer.append("\tDISCOVER((short) -2)\n");
+		buffer.append("\n\tprivate final short code;\n");
+		buffer.append("\n\tAscMetaType(short code) {\n");
+		buffer.append("\t\this.code = code;\n");
+		buffer.append("\t}\n");
+		buffer.append("\n\tpublic AscMetaType getType(short code) {\n");
+		buffer.append("\t\tfor (AscMetaType obj : AscMetaType.values()) {\n");
+		buffer.append("\t\t\tif (obj.code == code) {\n");
+		buffer.append("\t\t\t\treturn obj;\n");
+		buffer.append("\t\t\t}\n");
+		buffer.append("\t\t}\n");
+		buffer.append("\t\treturn AscMetaType.INVALID;\n");
+		buffer.append("\t}\n");		
+		buffer.append("}");
+		System.out.println(buffer);		
+	}
+
+	
 	private void generateEnumForObjects() {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("package eu.jgen.beegen.model.meta;\n");
-		buffer.append("public enum OBjMetaType {\n");
+		buffer.append("public enum ObjMetaType {\n");
 		for (ObjTypeCode objTypeCode : ObjTypeCode.values()) {
 			short code = ObjTypeHelper.getCode(objTypeCode);
 			if (code != -1) {
@@ -271,6 +361,7 @@ public class BeeGenExtractorSQLite {
 		buffer.append("}");
 		System.out.println(buffer);		
 	}
+
 	
 	
 	/*
