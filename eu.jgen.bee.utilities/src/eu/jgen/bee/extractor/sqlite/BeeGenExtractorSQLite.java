@@ -17,6 +17,8 @@ package eu.jgen.bee.extractor.sqlite;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -43,6 +45,8 @@ import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
 
+import eu.jgen.bee.extractor.BeeGenExtractor;
+
 /*
  * This class allows extract design metadata from the CA Gen Local Model and load
  * data to the purpose build SQLite database. The SQLite database constitutes 
@@ -53,9 +57,6 @@ import com.ca.gen.jmmi.util.PrpFormat;
  */
 public class BeeGenExtractorSQLite {
 	
-	private static String VERSION = "0.4";
-	private String SCHEMA = "9.2.A6";
-
 	private static final String STRING_SLASH = "\\";
 	private String BEE_FOLDER_NAME = "bee";
 
@@ -73,20 +74,24 @@ public class BeeGenExtractorSQLite {
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen Model Creator, Version " + VERSION);
+		System.out.println("Bee Gen Model Creator, Version: " + BeeGenExtractor.VERSION + ",  Schema Level: " + BeeGenExtractor.SCHEMA);
+		System.out.println("Extracts meta data from the CA Gen Model and creates Bee Gen Model.");
 		BeeGenExtractorSQLite extractor = new BeeGenExtractorSQLite();
 		try {
 			extractor.usage();
 			extractor.start(args[0]);
-			System.out.println("Extraction completed.");
+			System.out.println("Model extraction completed.");
 		} catch (EncyException e) {
-			System.out.println("Problem with connecting to the encyclopedia.");
+			System.out.println("Problem with connecting to the local CA Gen Model.");
 			e.printStackTrace();
 		} catch (ModelNotFoundException e) {
-			System.out.println("Cannot find model in the encyclopedia.");
+			System.out.println("Cannot find model.");
 			e.printStackTrace();
 		} catch (FileNotFoundException e) {
-			System.out.println("Problem with creating SQLIte database.");
+			System.out.println("Problem when creating SQLite database.");
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Problem creating enumerations..");
 			e.printStackTrace();
 		}
 	}
@@ -94,20 +99,25 @@ public class BeeGenExtractorSQLite {
 	private void usage() {
 		System.out.println("USAGE:");
 		System.out.println(
-				"\tpathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)");
-		System.out.println("\n");
+				"\tpathModel      -   Location of the directory containing local CA Gen Model (directory name should end with .ief)");
+		System.out.println("");
 	}
 
-	private void start(String modelPath) throws EncyException, ModelNotFoundException, FileNotFoundException {
-		System.out.println("Connecting to the CA Gen Model\n");
+	private void start(String modelPath) throws EncyException, ModelNotFoundException, IOException {
+		System.out.println("Connecting to the CA Gen Model in the directory '" + modelPath + "'");
 		ency = EncyManager.connectLocalForReadOnly(modelPath);
 		model = ModelManager.open(ency, ency.getModelIds().get(0));
 		modelName = model.getName();
-		String outputPath = clearTargetDestination(modelPath);
-		System.out.println("Connected to the model " + modelName + ".");
-		createDatabase(outputPath);
+		String outputPath = cleanTargetDestination(modelPath);
+		System.out.println("Connected to the model " + modelName + "...");
+		createDatabaseForModel(outputPath);
+		generateEnumForObjects(modelPath);
+		generateEnumForProperties(modelPath);
+		generateEnumForAssociations( modelPath);
+		
+		System.out.println("BeeGen Model '" + model.getName() + ".db' has been created in the sub-folder 'bee' of your CA Gen model '" + model.getName() + "' at location '" + modelPath + "'");
 
-		System.out.println("\nStatistics:\n");
+		System.out.println("Run Statistics:");
 		System.out.println("\tNumber of exported objects is " + objectcount);
 		System.out.println("\tNumber of exported properties is " + propertycount);
 		System.out.println("\tNumber of exported associations is " + associationcount);
@@ -115,17 +125,16 @@ public class BeeGenExtractorSQLite {
 		System.out.println("\tNumber of exported meta objects is " + objectmetacount);
 		System.out.println("\tNumber of exported meta properties is " + propertymetacount);
 		System.out.println("\tNumber of exported meta associations is " + associationmetacount); 
-		System.out.println("\n");
 	}
 
 	/*
 	 * The Bee Gen Model will be created in a new bee sub-folder of the <your-model>
 	 * .ief folder. Previous model will be overwritten by a newly created one.
 	 */
-	private String clearTargetDestination(String modelPath) {
+	private String cleanTargetDestination(String modelPath) {
 		File file = new File(modelPath);
 		if (!file.isDirectory()) {
-			System.out.println("Specified model path is not a correct folder.");
+			System.out.println("Specified location is not a path to the folder.");
 			System.exit(9);
 		}
 		file = new File(modelPath + STRING_SLASH + BEE_FOLDER_NAME);
@@ -140,19 +149,17 @@ public class BeeGenExtractorSQLite {
 		return null;
 	}
 
-	private void createDatabase(String outputPath) {
+	private void createDatabaseForModel(String outputPath) {
 
 		try {
 			Class.forName("org.sqlite.JDBC");
 			final SQLiteConfig config = new SQLiteConfig();
 			config.setJournalMode(JournalMode.OFF);
 			connection = config.createConnection("jdbc:sqlite:" + outputPath + STRING_SLASH + modelName + ".db");
-
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
 			System.exit(0);
 		}
-		System.out.println("Opened database successfully");
 		
 		String droptbl1 = "DROP TABLE IF EXISTS  GenObjects;";
 		String droptbl2 = "DROP TABLE  IF EXISTS GenAssociations;";
@@ -223,7 +230,7 @@ public class BeeGenExtractorSQLite {
 			stmt.execute(droptbl6);
 			stmt.execute(droptbl7);
 
-			System.out.println("Tables dropped");
+			System.out.println("Tables dropped...");
 
 			stmt.execute(sqlTblObj);
 			stmt.execute(sqlTblAsc);
@@ -235,26 +242,18 @@ public class BeeGenExtractorSQLite {
 			
 			stmt.execute(sqlTblModel);
 
-			System.out.println("Tables created");
+			System.out.println("Tables created...");
 
-			connection.setAutoCommit(false);
-			
-			extractObjectsAndProperties();
-			
-			populateModel();
-			
-//			extractAssociations();
-//			
-//			extractMeatDataForObjects();
-//			extractMeatDataForProperties();
-//			extractMeatDataForAssociations();
-			
-//			generateEnumForObjects();
-//			generateEnumForProperties();
-			generateEnumForAssociations();
-			
+			connection.setAutoCommit(false);			
+			extractObjectsAndProperties();			
+			populateModelTable();			
+			extractAssociations();			
+			extractMetaDataForObjects();
+			extractMetaDataForProperties();
+			extractMetaDataForAssociations();
 			connection.commit();
 			stmt.close();
+			System.out.println("Tables populated...");
 		} catch (SQLException e) {
 			System.out.println(e.getMessage());
 		} catch (EncyUnsupportedOperationException e) {
@@ -262,22 +261,22 @@ public class BeeGenExtractorSQLite {
 		}
 	}
 	
-	private void populateModel() throws SQLException {
+	private void populateModelTable() throws SQLException {
 		String queryModel = "INSERT INTO GenModel  (key, value) VALUES (?,?);";
 		PreparedStatement statementModel = connection.prepareStatement(queryModel);
 		statementModel.setString(1, "name");
 		statementModel.setString(2, model.getName());
 		statementModel.executeUpdate();
 		statementModel.setString(1, "version");
-		statementModel.setString(2, VERSION);
-		statementModel.executeUpdate();
+		statementModel.setString(2, BeeGenExtractor.VERSION);
+		statementModel.executeUpdate(); 
 		statementModel.setString(1, "schema");
-		statementModel.setString(2, SCHEMA);
+		statementModel.setString(2, BeeGenExtractor.SCHEMA);
 		statementModel.executeUpdate();
 		statementModel.close();
 	}
 	
-	private void generateEnumForProperties() {
+	private void generateEnumForProperties(String modelPath) throws IOException {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("package eu.jgen.beegen.model.meta;\n");
 		buffer.append("public enum PrpMetaType {\n");
@@ -302,10 +301,13 @@ public class BeeGenExtractorSQLite {
 		buffer.append("\t\treturn PrpMetaType.INVALID;\n");
 		buffer.append("\t}\n");		
 		buffer.append("}");
-		System.out.println(buffer);		
+		//System.out.println(buffer);	
+		FileWriter 	fileWriter = new FileWriter(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +" PrpMetaType.java");
+		fileWriter.write(buffer.toString());
+		fileWriter.close();
 	}
 	
-	private void generateEnumForAssociations() {
+	private void generateEnumForAssociations(String modelPath) throws IOException {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("package eu.jgen.beegen.model.meta;\n");
 		buffer.append("public enum AscMetaType {\n");
@@ -330,11 +332,14 @@ public class BeeGenExtractorSQLite {
 		buffer.append("\t\treturn AscMetaType.INVALID;\n");
 		buffer.append("\t}\n");		
 		buffer.append("}");
-		System.out.println(buffer);		
+		//System.out.println(buffer);	
+		FileWriter 	fileWriter = new FileWriter(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +" AscMetaType.java");
+		fileWriter.write(buffer.toString());
+		fileWriter.close();
 	}
 
 	
-	private void generateEnumForObjects() {
+	private void generateEnumForObjects(String modelPath) throws IOException {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("package eu.jgen.beegen.model.meta;\n");
 		buffer.append("public enum ObjMetaType {\n");
@@ -359,16 +364,17 @@ public class BeeGenExtractorSQLite {
 		buffer.append("\t\treturn ObjMetaType.INVALID;\n");
 		buffer.append("\t}\n");		
 		buffer.append("}");
-		System.out.println(buffer);		
+		//System.out.println(buffer);
+		FileWriter 	fileWriter = new FileWriter(modelPath + STRING_SLASH + BEE_FOLDER_NAME + STRING_SLASH +" ObjMetaType.java");
+		fileWriter.write(buffer.toString());
+		fileWriter.close();
 	}
 
-	
-	
 	/*
 	 * Populates tables with meta data.
 	 */
 	
-	private void extractMeatDataForAssociations() throws SQLException {
+	private void extractMetaDataForAssociations() throws SQLException {
 		System.out.println("Loading meta data for associations...");
 
 		String queryMetaAsc = "INSERT INTO GenMetaAssociations  (fromObjType, ascType, ascMnemonic, direction, inverseAscType, optionality, card, ordered) VALUES (?,?,?,?,?,?,?,?);";
@@ -378,9 +384,7 @@ public class BeeGenExtractorSQLite {
 					objTypeCode == ObjTypeCode.GUIPROP) {
 				continue;
 			}
-			//System.out.println(objTypeCode);
 			for (AscTypeCode ascTypeCode : ObjTypeHelper.getAssociations(objTypeCode)) {
-				//System.out.println("\t " + ascTypeCode);
 				statementAsc.setInt(1, ObjTypeHelper.getCode(objTypeCode));
 				statementAsc.setInt(2, AscTypeHelper.getCode(ascTypeCode));
 				statementAsc.setString(3, AscTypeHelper.getMnemonic(ascTypeCode));
@@ -389,7 +393,6 @@ public class BeeGenExtractorSQLite {
 				} else {
 					statementAsc.setString(4, "B");
 				}			
-				//statementAsc.setInt(5, AscTypeHelper.getCode(AscTypeHelper.getInverse(objTypeCode, ascTypeCode)));
 				statementAsc.setInt(5,100);
 				if (AscTypeHelper.isIgnorable(objTypeCode, ascTypeCode)) {
 					statementAsc.setString(6, "Y");
@@ -412,7 +415,7 @@ public class BeeGenExtractorSQLite {
 		}
 	}
 
-	private void extractMeatDataForProperties() throws SQLException {
+	private void extractMetaDataForProperties() throws SQLException {
 		System.out.println("Loading meta data for properties...");
 		String queryMetaPrp = "INSERT INTO GenMetaProperties  (objType, prpType, prpMnemonic, format, length, defaultInt, defaultText, defaultChar) VALUES (?,?,?,?,?,?,?,?);";
 		PreparedStatement statementPrp = connection.prepareStatement(queryMetaPrp);
@@ -462,7 +465,7 @@ public class BeeGenExtractorSQLite {
 		}
 	}
 
-	private void extractMeatDataForObjects() throws SQLException {
+	private void extractMetaDataForObjects() throws SQLException {
 		System.out.println("Loading meta data for objects...");
 		String queryMetaObj = "INSERT INTO GenMetaObjects  (objType, objMnemonic) VALUES (?,?);";
 		PreparedStatement statementObj = connection.prepareStatement(queryMetaObj);

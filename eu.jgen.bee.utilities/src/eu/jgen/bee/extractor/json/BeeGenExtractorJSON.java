@@ -41,6 +41,8 @@ import com.ca.gen.jmmi.schema.PrpTypeCode;
 import com.ca.gen.jmmi.schema.PrpTypeHelper;
 import com.ca.gen.jmmi.util.PrpFormat;
 
+import eu.jgen.bee.extractor.BeeGenExtractor;
+
 public class BeeGenExtractorJSON {
 	
 	private static final String ASSOCIATIONS_JSON = "associations.json";
@@ -57,12 +59,13 @@ public class BeeGenExtractorJSON {
 
 	public static void main(String[] args) {
 
-		System.out.println("Bee Gen  Model Extractor, Version 0.2");
+		System.out.println("Bee Gen  Model Extractor, Version " + BeeGenExtractor.VERSION + ", Schema Level " + BeeGenExtractor.SCHEMA);
+		System.out.println("Extracts meta data from the CA Gen Model and creates two JSON files showing entire model contents.");
 		BeeGenExtractorJSON extractor = new BeeGenExtractorJSON();
 		try {
 			extractor.usage();
 			extractor.start(args[0]);
-			System.out.println("Extraction completed.");
+			System.out.println("Transactions extraction completed.");
 		} catch (EncyException e) {
 			System.out.println("Problem with connecting to the encyclopedia.");
 			e.printStackTrace();
@@ -79,7 +82,6 @@ public class BeeGenExtractorJSON {
 		System.out.println("USAGE:");
 		System.out.println(
 				"\tpathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)");
-		System.out.println("\n");
 	}
 
 	/*
@@ -88,22 +90,24 @@ public class BeeGenExtractorJSON {
 	 */
 	private void start(String modelPath)
 			throws EncyException, ModelNotFoundException, FileNotFoundException {
-		 System.out.println("Connecting to the CA Gen Model\n");
+		System.out.println("Connecting to the CA Gen Model in the directory '" + modelPath + "'");
 		ency = EncyManager.connectLocalForReadOnly(modelPath);
 		model = ModelManager.open(ency, ency.getModelIds().get(0));
 		modelName = model.getName();
 		
 		String outputPath = clearTargetDestination(modelPath);
-		System.out.println("Connected to the model " + modelName + ".");
-		
+		System.out.println("Connected to the model " + modelName + "...");
+		System.out.println("Extracting object and property definitions...");
 		FileOutputStream outputStreamForObjects = new FileOutputStream(outputPath +  STRING_SLASH +OBJECTS_JSON);
 		extractObjectsAndProperties(outputStreamForObjects);
-		System.out.println("\tStarting...");
+		System.out.println("Extracting associations definitions...");
 		FileOutputStream outputStreamForAssociations = new FileOutputStream(outputPath +  STRING_SLASH + ASSOCIATIONS_JSON);
 		extractAssociations(outputStreamForAssociations);
-		System.out.println("\tNumber of exported objects is " + objectcount);
-		System.out.println("\tNumber of exported properties is " + propertycount);
-		System.out.println("\tNumber of exported associations is " + associationcount);
+		System.out.println("Two transaction files have been created in the sub-folder 'bee' of your CA Gen model '" + model.getName() + "' at location '" + modelPath + "'");
+		System.out.println("Run Statistics:");
+		System.out.println("\tNumber of exported object definitions is " + objectcount);
+		System.out.println("\tNumber of exported property definitions  is " + propertycount);
+		System.out.println("\tNumber of exported association definitions is " + associationcount);
 	}
 	
 	private String clearTargetDestination(String modelPath) {
