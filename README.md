@@ -44,7 +44,7 @@ Exception in thread "main" java.lang.UnsatisfiedLinkError: C:\Program Files (x86
 Example of use
 ==============
 
-Here is an example of the Swift programming program using the API.
+Sample use of BeeGenExtractorJSON.
 
 ```sh
 Bee Gen  Model Extractor, Version 0.5, Schema Level 9.2.A6
@@ -76,7 +76,7 @@ List of action blocks in the model: BEEGEN01, Using schema level: BEEGEN01
 
 Completed.
 ```
-Sample JSON generated for the objects and properties
+Sample JSON generated for the objects and properties.
 
 ```sh
 [
@@ -117,7 +117,7 @@ Sample JSON generated for the objects and properties
       },
 
 ```
-Sample JSON generated for associations
+Sample JSON generated for associations.
 
 ```sh
 [
@@ -152,7 +152,7 @@ Sample JSON generated for associations
     "direction" : "F"
   },
 ```
-The second utility requires SQLite to be installed before you can run it. It will create a database and populate with the data extracted from the CA Gen model.\
+The second utility requires SQLite to be installed before you can run it. It will create a database and populate with the data extracted from the CA Gen model.
 
 Sample use of BeeGenExtractorSQLite
 
