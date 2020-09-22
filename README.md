@@ -5,9 +5,17 @@
 Overview
 ========
 
-Bee Gen API for Swift is part of the Bee Gen Model Framework project. The framework allows extracting design metadata from the CA Gen Local model and import design data to the framework. The framework has its own method of storing metadata in a dedicated container and preset its contents as a model. Bee Gen API provides a means to access such metadata, constituting what we consider a model imported from the CA Gen.
 
-A container uses SQLite as a means of storing and retrieving information. Therefore you need to have SQLite installed in your environment. Since SQLite and Java are portable and can run on many supporting platforms, the framework and applications developed using the framework can be installed and run on all those supporting platforms.
+There are two command-line utilities assisting developers in extracting information from the CA Gen Local Model.  They are both 32-bit Java command-line programs running on Windows and using the CA Gen JMMI API to access local models.
+
+Summary of utilities
+
+BeeGenExtractorJSON
+This utility accesses CA Gen Local Model and extracts metadata from the model and exporting the entire model's contents to two JSON text files.
+BeeGenExtractorSQLite
+This utility accesses the CA Gen Local Model and extracts its contents creating and populating an SQLite database.
+
+
 
 [Bee Gen API for Swift doumentation can be downloded here.](https://github.com/JGen-Notes/BeeGenAPIJava/blob/master/eu.jgen.beegen.model.api/BeeGenAPIDoc.zip)
 
@@ -26,25 +34,32 @@ Versions of used Software
 
 - [XCode 12](https://developer.apple.com/xcode/)
 
+You are using the wrong version of Java to run utilities in case you have the following exception message:
+
+```sh
+Exception in thread "main" java.lang.UnsatisfiedLinkError: C:\Program Files (x86)\CA\Gen86Free\Gen\genmodel_client.dll: Can't load IA 32-bit .dll on a AMD 64-bit platform
+```
+
 Example of use
 ==============
 
 Here is an example of the Swift programming program using the API.
 
 ```sh
-   func testSampleApplication() {
-        let containerPath = "/Users/Xxxxx/beegen01.ief/bee/BEEGEN01.db"
-        let genContainer = JGenContainer()
-        let genModel = genContainer.connect(to: containerPath)
-        print("List of action blocks in the model: " + genModel!.getName() + ", Using schema level: "
-                + genModel!.getSchema() + "\n")
-        for genObject in genModel!.findTypeObjects(haveType: ObjMetaType.ACBLKBSD) {
-            print("\tAction block name: " + genObject.findTextProperty(haveType: PrpMetaType.NAME) + ", having id: \(genObject.id)"
-            )
-        }
-        genContainer.disconnect();
-        print("\nCompleted.");
-    }
+Bee Gen  Model Extractor, Version 0.5, Schema Level 9.2.A6
+Extracts meta data from the CA Gen Model and creates two JSON files showing entire model contents.
+USAGE:
+	pathModel      -   Location of the directory containing CA Gen Local Model (directory ending with .ief)
+Connecting to the CA Gen Model in the directory 'C:\Gen\Models\beegen01.ief'
+Connected to the model BEEGEN01...
+Extracting object and property definitions...
+Extracting associations definitions...
+Two transaction files have been created in the sub-folder 'bee' of your CA Gen model 'BEEGEN01' at location 'C:\Gen\Models\beegen01.ief'
+Run Statistics:
+	Number of exported object definitions is 1228
+	Number of exported property definitions  is 4174
+	Number of exported association definitions is 3722
+Transactions extraction completed.
 ```
 
 It produces the following output:
@@ -59,4 +74,110 @@ List of action blocks in the model: BEEGEN01, Using schema level: BEEGEN01
 	Action block name: PERSON_LIST, having id: 22020100
 
 Completed.
+```
+Sample JSON generated for the objects and properties
+
+```sh
+[
+  {
+    "id" : 22020096,
+    "type" : 21,
+    "mnemonic" : "ACBLKBSD",
+    "properties" : [
+      {
+        "type" : 30,
+        "format" : "INT",
+        "mnemonic" : "CEID",
+        "value" : "1049"
+      },
+      {
+        "type" : 232,
+        "format" : "SINT",
+        "mnemonic" : "OPCODE",
+        "value" : "21"
+      },
+      {
+        "type" : 224,
+        "format" : "NAME",
+        "mnemonic" : "NAME",
+        "value" : "PERSON_CREATE"
+      },
+      {
+        "type" : 216,
+        "format" : "INT",
+        "mnemonic" : "MODDATE",
+        "value" : "20200831"
+      },
+      {
+        "type" : 219,
+        "format" : "INT",
+        "mnemonic" : "MODTIME",
+        "value" : "19545839"
+      },
+
+```
+Sample JSON generated for associations
+
+```sh
+[
+  {
+    "from" : 22020096,
+    "card" : "1",
+    "mnemonic" : "GRPBY",
+    "type" : 88,
+    "inverseType" : 381,
+    "to" : 6291508,
+    "seqno" : 0,
+    "direction" : "F"
+  },
+  {
+    "from" : 22020096,
+    "card" : "M",
+    "mnemonic" : "USESEXST",
+    "type" : 611,
+    "inverseType" : 659,
+    "to" : 134217729,
+    "seqno" : 0,
+    "direction" : "F"
+  },
+  {
+    "from" : 22020096,
+    "card" : "M",
+    "mnemonic" : "USESEXST",
+    "type" : 611,
+    "inverseType" : 659,
+    "to" : 134217728,
+    "seqno" : 1,
+    "direction" : "F"
+  },
+```
+The second utility requires SQLite to be installed before you can run it. It will create a database and populate with the data extracted from the CA Gen model.\
+
+Sample use of BeeGenExtractorSQLite
+
+```sh
+Bee Gen Model Creator, Version: 0.5,  Schema Level: 9.2.A6
+Extracts meta data from the CA Gen Model and creates Bee Gen Model.
+USAGE:
+	pathModel      -   Location of the directory containing local CA Gen Model (directory name should end with .ief)
+
+Connecting to the CA Gen Model in the directory 'C:\Gen\Models\beegen01.ief'
+Connected to the model BEEGEN01...
+Tables dropped...
+Tables created...
+Loading objects and properties...
+Loading associations...
+Loading meta data for objects...
+Loading meta data for properties...
+Loading meta data for associations...
+Tables populated...
+BeeGen Model 'BEEGEN01.db' has been created in the sub-folder 'bee' of your CA Gen model 'BEEGEN01' at location 'C:\Gen\Models\beegen01.ief'
+Run Statistics:
+	Number of exported objects is 1228
+	Number of exported properties is 4174
+	Number of exported associations is 3722
+	Number of exported meta objects is 642
+	Number of exported meta properties is 14433
+	Number of exported meta associations is 9423
+Model extraction completed.
 ```
