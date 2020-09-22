@@ -29,9 +29,11 @@ Versions of used Software
 
 - [SQLite Release 3.33.0 On 2020-08-14](https://sqlite.org/index.html)
 
-- [Swift 5.3](https://swift.org)
+- [sqlite-jdbc-3.32.3.2](https://github.com/xerial/sqlite-jdbc/releases)
 
-- [XCode 12](https://developer.apple.com/xcode/)
+- [Java SE 8 1.8.0_05](https://www.oracle.com/java/technologies/javase-jre8-downloads.html)
+
+- [Eclipse Version: 2020-06 (4.16.0)](https://www.eclipse.org/downloads/)
 
 You are using the wrong version of Java to run utilities in case you have the following exception message:
 
