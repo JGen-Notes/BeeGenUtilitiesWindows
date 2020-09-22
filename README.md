@@ -8,13 +8,12 @@ Overview
 
 There are two command-line utilities assisting developers in extracting information from the CA Gen Local Model.  They are both 32-bit Java command-line programs running on Windows and using the CA Gen JMMI API to access local models.
 
-Summary of utilities
+Summary of utilities:
 
-BeeGenExtractorJSON
+- BeeGenExtractorJSON
 This utility accesses CA Gen Local Model and extracts metadata from the model and exporting the entire model's contents to two JSON text files.
-BeeGenExtractorSQLite
+- BeeGenExtractorSQLite
 This utility accesses the CA Gen Local Model and extracts its contents creating and populating an SQLite database.
-
 
 
 [Bee Gen API for Swift doumentation can be downloded here.](https://github.com/JGen-Notes/BeeGenAPIJava/blob/master/eu.jgen.beegen.model.api/BeeGenAPIDoc.zip)
