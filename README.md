@@ -15,9 +15,6 @@ This utility accesses CA Gen Local Model and extracts metadata from the model an
 - BeeGenExtractorSQLite.
 This utility accesses the CA Gen Local Model and extracts its contents creating and populating an SQLite database.
 
-
-[Bee Gen API for Swift doumentation can be downloded here.](https://github.com/JGen-Notes/BeeGenAPIJava/blob/master/eu.jgen.beegen.model.api/BeeGenAPIDoc.zip)
-
 More about project you can find [here](http://www.jgen.eu/?p=900&preview=true).
 
 > The Bee Gen Model Framework is still under
