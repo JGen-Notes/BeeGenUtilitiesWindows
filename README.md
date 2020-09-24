@@ -10,9 +10,9 @@ There are two command-line utilities assisting developers in extracting informat
 
 Summary of utilities:
 
-- BeeGenExtractorJSON
+- BeeGenExtractorJSON.
 This utility accesses CA Gen Local Model and extracts metadata from the model and exporting the entire model's contents to two JSON text files.
-- BeeGenExtractorSQLite
+- BeeGenExtractorSQLite.
 This utility accesses the CA Gen Local Model and extracts its contents creating and populating an SQLite database.
 
 
